@@ -10,7 +10,7 @@ license = {text = "MIT"}
 dependencies = [
     "websockets"
 ]
-readme = "README.txt"
+readme = "README.md"
 classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
