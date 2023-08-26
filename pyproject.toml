@@ -3,7 +3,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "simple-twitch-chat-listener"
+name = "simple_twitch_chat_listener"
 version = "0.1.0"
 description = "Very simple to use Twitch chat bot for lurking chat that does not require an oauth token"
 license = {text = "MIT"}

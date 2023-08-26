@@ -21,14 +21,27 @@ pip install -U simple-twitch-chat-listener
 ```
 
 ## Example usage
+
 ```python
-import simple-twitch-chat-listener
+from simple_twitch_chat_listener import TwitchChatListener
 
-def my_chat_handler
+def my_message_handler(username, message):
+    print(f"{username}: {message}")
 
-tc = simple-twitch-chat-listener.TwitchChatListener("channelname")
-tc. 
+tc = TwitchChatListener("goldenbeaster")
+tc.set_client_message_handler(my_message_handler)
+tc.start()
+
+# Place your code here
+import time
+time.sleep(10)
+# endof place your code here
+
+# once you want to stop the service
+tc.stop()
 ```
+
+Other examples can be found [here](./examples/)
 
 ## Stuff that still needs to be done
 
