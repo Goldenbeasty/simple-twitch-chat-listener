@@ -16,6 +16,7 @@ class TwitchChatListener:
         self._stop_requested = threading.Event()  # Use an event for stopping
         self._disconnect_timeout = 1 # seconds
         self.verbose_sysmessages = False
+        self.connected = False
 
     def set_client_message_handler(self, handler: Callable[str, str]):
         """
@@ -38,6 +39,7 @@ class TwitchChatListener:
 
     async def join_chat(self):
         async with websockets.connect(f"wss://irc-ws.chat.twitch.tv:443") as self.ws:
+            self.connected = True
             await self.ws.send(f"PASS oauth:{self.OAUTH_TOKEN}")
             await self.ws.send(f"NICK {self.NICKNAME}")
             await self.ws.send(f"JOIN {self.CHANNEL}")
@@ -50,11 +52,13 @@ class TwitchChatListener:
                         pass  # Continue the loop if no message is received within the timeout
                     else:
                         await self.messagehandler(message)
-                except websockets.exceptions.ConnectionClosedError:
+                except websockets.exceptions.ConnectionClosedError: ### I have no idea, how the code is supposed to save itself from this
+                    self.connected = False
                     print("Connection closed, attempting to reconnect")
                     await asyncio.sleep(5)
             await self.ws.send("PART")
             await self.ws.close()
+            self.connected = False
 
     async def _start_loop(self):
         self.connected = True
