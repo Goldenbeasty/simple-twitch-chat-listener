@@ -6,7 +6,6 @@ build-backend = "setuptools.build_meta"
 name = "simple_twitch_chat_listener"
 description = "Very simple to use Twitch chat bot for lurking chat that does not require an oauth token"
 license = {text = "MIT"}
-Repository = "https://github.com/goldenbeasty/simple-twitch-chat-listener"
 dependencies = [
     "websockets"
 ]
@@ -21,3 +20,6 @@ dynamic = ["version"]
 
 [tool.setuptools_scm]
 write_to = "simple_twitch_chat_listener/_version.py"
+
+[project.urls]
+Repository = "https://github.com/goldenbeasty/simple-twitch-chat-listener"
