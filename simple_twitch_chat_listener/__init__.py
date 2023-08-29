@@ -4,10 +4,10 @@ import re
 import threading
 import time
 import random
-from typing import Callable
+from typing import Callable, Union
 
 class TwitchChatListener:
-    def __init__(self, CHANNEL: str, OAUTH_TOKEN:str="SCHMOOPIIE", NICKNAME:str=f"justinfan{random.randint(10000, 99999)}"):
+    def __init__(self, CHANNEL: str, OAUTH_TOKEN:str="SCHMOOPIIE", NICKNAME:str=f"justinfan{random.randint(10000, 99999)}", twitch_irc_capability_tags:bool = False):
         self.CHANNEL = "#" + CHANNEL
         self.OAUTH_TOKEN = OAUTH_TOKEN
         self.NICKNAME = NICKNAME
@@ -15,13 +15,23 @@ class TwitchChatListener:
         self.thread = threading.Thread(target=self._run_loop)
         self._stop_requested = threading.Event()  # Use an event for stopping
         self._disconnect_timeout = 1 # seconds
-        self.verbose_sysmessages = False
         self.connected = False
 
-    def set_client_message_handler(self, handler: Callable[str, str]):
+        ### Optional tagging
+        self.twitch_irc_capability_tags = twitch_irc_capability_tags
+        self.verbose_sysmessages = False
+
+        ### Setup logic
+        self._internal_message_handler_function = self.messagehandler
+        if self.twitch_irc_capability_tags:
+            self._internal_message_handler_function = self.advanced_messagehandler
+
+
+    def set_client_message_handler(self, handler: Union[Callable[[str, str], None],Callable[[str, str, dict], None]]):
         """
         Sets the message handler function to pass the message data to
         Expects a function with arg1 = username arg2 = message
+        Alternatively when using the tags capability arg3 = tags_dict
         """
         self.message_handler_function = handler
 
@@ -37,9 +47,35 @@ class TwitchChatListener:
             if ping:
                 await self.ws.send(f"PONG :{ping.group(1)}")
 
+    def twitch_taghandler(self, tagstring:str) -> dict:
+        """
+        Parse the irc twitch tags from string to a dict
+        """
+        response = {}
+        search = re.finditer(r"([\w\-]+)=([\w/#:-]+|)?;?", tagstring)
+        for match in search:
+            response[match.group(1)] = match.group(2)
+        return response
+
+    async def advanced_messagehandler(self, message_input: str) -> None:
+        match = re.match(r"^@(.*?)(?: |$):\w+!\w+@\w+\.tmi\.twitch\.tv PRIVMSG #(\w+) :(.*)\r\n", message_input)
+        if match:
+            tags = match.group(1)
+            parsed_tags = self.twitch_taghandler(tags)
+            username = match.group(2)
+            message = match.group(3)
+            self.message_handler_function(username, message, parsed_tags)
+        else:
+            if self.verbose_sysmessages: print(message_input)
+            ping = re.match(r"^PING :(\w+(?:\.\w+)+)", message_input)
+            if ping:
+                await self.ws.send(f"PONG :{ping.group(1)}")
+
     async def join_chat(self):
         async with websockets.connect(f"wss://irc-ws.chat.twitch.tv:443") as self.ws:
             self.connected = True
+            if self.twitch_irc_capability_tags:
+                await self.ws.send("CAP REQ :twitch.tv/commands twitch.tv/tags")
             await self.ws.send(f"PASS oauth:{self.OAUTH_TOKEN}")
             await self.ws.send(f"NICK {self.NICKNAME}")
             await self.ws.send(f"JOIN {self.CHANNEL}")
@@ -51,7 +87,7 @@ class TwitchChatListener:
                     except asyncio.TimeoutError:
                         pass  # Continue the loop if no message is received within the timeout
                     else:
-                        await self.messagehandler(message)
+                        await self._internal_message_handler_function(message)
                 except websockets.exceptions.ConnectionClosedError: ### I have no idea, how the code is supposed to save itself from this
                     self.connected = False
                     print("Connection closed, attempting to reconnect")
@@ -80,8 +116,14 @@ class TwitchChatListener:
         self._stop_requested.set()
         self.thread.join(timeout=self._disconnect_timeout)
 
-def example_chat_handler(uname: str, msg: str) -> None:
+def example_chat_handler(uname: str, msg: str, tags:dict = {}) -> None:
     print(f"{uname}: {msg}")
+    ### This part is completely optional and can only run when twitch_irc_capability_tags
+    if len(tags) > 0 :
+        for tag, value in tags.items():
+            print(f"{tag}: {value}\t", end="")
+        print()
+
 
 def main():
     tc = TwitchChatListener("goldenbeaster")
