@@ -58,7 +58,7 @@ class TwitchChatListener:
         return response
 
     async def advanced_messagehandler(self, message_input: str) -> None:
-        match = re.match(r"^@(.*?)(?: |$):\w+!\w+@\w+\.tmi\.twitch\.tv PRIVMSG #(\w+) :(.*)\r\n", message_input)
+        match = re.match(r"^@(.*?)(?: |$):(\w+)!\w+@\w+\.tmi\.twitch\.tv PRIVMSG #\w+ :(.*)\r\n", message_input)
         if match:
             tags = match.group(1)
             parsed_tags = self.twitch_taghandler(tags)
