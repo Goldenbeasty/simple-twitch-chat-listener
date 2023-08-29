@@ -13,7 +13,9 @@ def chat_handler(username, message, tags = {}) -> None:
     if len(tags) == 0:
         print(f"{username}: {message}")
     else:
-        print(f"{print_colored(username, tags['color'])}: {message}")
+        if tags["color"] != "":
+            username = print_colored(username, tags["color"])
+        print(f"{username}: {message}")
 
 
 tc = TwitchChatListener("goldenbeaster", twitch_irc_capability_tags=True)
