@@ -20,12 +20,7 @@ class TwitchChatListener:
         ### Optional tagging
         self.twitch_irc_capability_tags = twitch_irc_capability_tags
         self.verbose_sysmessages = False
-
-        ### Setup logic
-        self._internal_message_handler_function = self.messagehandler
-        if self.twitch_irc_capability_tags:
-            self._internal_message_handler_function = self.advanced_messagehandler
-
+        self.unhandled_message_handler = None 
 
     def set_client_message_handler(self, handler: Union[Callable[[str, str], None],Callable[[str, str, dict], None]]):
         """
@@ -35,17 +30,34 @@ class TwitchChatListener:
         """
         self.message_handler_function = handler
 
+    def set_unhandled_message_handler(self, handler: Union[Callable[[str],None], None]) -> None:
+        """
+        Setting this is optional. This function is used for setting the function that is supposed to recive all the messages that are not caught by this class itself. It is mainly used for debugging.
+        """
+        self.unhandled_message_handler = handler
+
     async def messagehandler(self, message_input: str) -> None:
-        match = re.match(r"^:(\w+)!\w+@\w+.tmi.twitch.tv PRIVMSG #\w+ :(.*)\r\n$", message_input)
-        if match:
-            username = match.group(1)
-            message = match.group(2)
-            self.message_handler_function(username, message)
+        if not self.twitch_irc_capability_tags: # simpler case
+            match = re.match(r"^:(\w+)!\w+@\w+.tmi.twitch.tv PRIVMSG #\w+ :(.*)\r\n$", message_input)
+            if match:
+                username = match.group(1)
+                message = match.group(2)
+                self.message_handler_function(username, message)
         else:
-            if self.verbose_sysmessages: print(message_input)
-            ping = re.match(r"^PING :(\w+(?:\.\w+)+)", message_input)
+            match = re.match(r"^@(.*?)(?: |$):(\w+)!\w+@\w+\.tmi\.twitch\.tv PRIVMSG #\w+ :(.*)\r\n", message_input)
+            if match:
+                tags = match.group(1)
+                parsed_tags = self.twitch_taghandler(tags)
+                username = match.group(2)
+                message = match.group(3)
+                self.message_handler_function(username, message, parsed_tags)
+        if not match: # not a standard message
+            if self.verbose_sysmessages: print(message_input) # debugging output
+            ping = re.match(r"^PING :(\w+(?:\.\w+)+)", message_input) # keepalive message
             if ping:
                 await self.ws.send(f"PONG :{ping.group(1)}")
+            elif self.unhandled_message_handler:
+                self.unhandled_message_handler(message_input)
 
     def twitch_taghandler(self, tagstring:str) -> dict:
         """
@@ -56,20 +68,6 @@ class TwitchChatListener:
         for match in search:
             response[match.group(1)] = match.group(2)
         return response
-
-    async def advanced_messagehandler(self, message_input: str) -> None:
-        match = re.match(r"^@(.*?)(?: |$):(\w+)!\w+@\w+\.tmi\.twitch\.tv PRIVMSG #\w+ :(.*)\r\n", message_input)
-        if match:
-            tags = match.group(1)
-            parsed_tags = self.twitch_taghandler(tags)
-            username = match.group(2)
-            message = match.group(3)
-            self.message_handler_function(username, message, parsed_tags)
-        else:
-            if self.verbose_sysmessages: print(message_input)
-            ping = re.match(r"^PING :(\w+(?:\.\w+)+)", message_input)
-            if ping:
-                await self.ws.send(f"PONG :{ping.group(1)}")
 
     async def join_chat(self):
         async with websockets.connect(f"wss://irc-ws.chat.twitch.tv:443") as self.ws:
@@ -87,7 +85,7 @@ class TwitchChatListener:
                     except asyncio.TimeoutError:
                         pass  # Continue the loop if no message is received within the timeout
                     else:
-                        await self._internal_message_handler_function(message)
+                        await self.messagehandler(message)
                 except websockets.exceptions.ConnectionClosedError: ### I have no idea, how the code is supposed to save itself from this
                     self.connected = False
                     print("Connection closed, attempting to reconnect")
