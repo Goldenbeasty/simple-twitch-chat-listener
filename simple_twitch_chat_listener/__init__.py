@@ -32,7 +32,7 @@ class TwitchChatListener:
 
     def set_unhandled_message_handler(self, handler: Union[Callable[[str],None], None]) -> None:
         """
-        Setting this is optional. This function is used for setting the function that is supposed to recive all the messages that are not caught by this class itself. It is mainly used for debugging.
+        Setting this is optional. Needs an async function. This function is used for setting the function that is supposed to recive all the messages that are not caught by this class itself. It is mainly used for debugging.
         """
         self.unhandled_message_handler = handler
 
@@ -57,7 +57,7 @@ class TwitchChatListener:
             if ping:
                 await self.ws.send(f"PONG :{ping.group(1)}")
             elif self.unhandled_message_handler:
-                self.unhandled_message_handler(message_input)
+                await self.unhandled_message_handler(message_input)
 
     def twitch_taghandler(self, tagstring:str) -> dict:
         """
