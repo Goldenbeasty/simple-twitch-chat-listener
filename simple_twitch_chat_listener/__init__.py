@@ -95,7 +95,6 @@ class TwitchChatListener:
             self.connected = False
 
     async def _start_loop(self):
-        self.connected = True
         await self.join_chat()
 
     def _run_loop(self):
